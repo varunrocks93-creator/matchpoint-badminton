@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MatchPoint Badminton</title>
+<style>
+:root{
+  --bg:#07111f;--panel:#0e1b2d;--panel2:#12233a;--text:#f7fbff;--muted:#9fb2c9;
+  --accent:#35d07f;--accent2:#6ee7a7;--line:#223752;--danger:#ff6b6b;--gold:#ffd166;
+  --shadow:0 18px 50px rgba(0,0,0,.28)
+}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:
+radial-gradient(circle at 10% 0%,#12345a 0,transparent 28%),var(--bg);color:var(--text);min-height:100vh}
+button,input,select{font:inherit}.wrap{max-width:1100px;margin:auto;padding:22px}
+.hero{padding:28px 0 10px}.brand{display:flex;align-items:center;gap:12px}.logo{width:48px;height:48px;border-radius:16px;
+display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),#1aa7ff);font-size:27px;box-shadow:var(--shadow)}
+h1{font-size:clamp(28px,5vw,46px);margin:0;letter-spacing:-1.4px}.sub{color:var(--muted);margin:7px 0 0}
+.stepper{display:flex;gap:8px;overflow:auto;padding:16px 0 20px}.stepchip{white-space:nowrap;border:1px solid var(--line);color:var(--muted);
+padding:8px 12px;border-radius:999px;font-size:13px}.stepchip.active{border-color:var(--accent);color:var(--text);background:#103528}
+.panel{background:linear-gradient(180deg,rgba(18,35,58,.97),rgba(12,26,44,.97));border:1px solid var(--line);
+border-radius:22px;padding:20px;box-shadow:var(--shadow);margin-bottom:18px}.panel h2{margin:0 0 6px;font-size:22px}.hint{color:var(--muted);font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+label{display:block;color:#d8e5f2;font-size:13px;font-weight:700;margin-bottom:7px}.field{width:100%;border:1px solid #2a4364;background:#091624;color:var(--text);
+border-radius:13px;padding:12px 13px;outline:none}.field:focus{border-color:var(--accent)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.btn{border:0;border-radius:13px;padding:12px 16px;font-weight:800;cursor:pointer}
+.btn.primary{background:var(--accent);color:#04150d}.btn.secondary{background:#1a2d47;color:var(--text);border:1px solid #2b4566}
+.btn.danger{background:#3a1d27;color:#ffd8dc;border:1px solid #6e2d3c}.btn:disabled{opacity:.45;cursor:not-allowed}
+.error{margin-top:12px;color:#ffd2d2;background:#431f29;border:1px solid #733142;padding:10px 12px;border-radius:12px}
+.names{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:16px}
+.namebox{display:flex;align-items:center;gap:8px}.num{width:30px;color:var(--muted);font-weight:800;text-align:center}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}.stat{background:#0a1727;border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:#dfeeff}
+.schedule{display:grid;gap:14px}.round{border:1px solid var(--line);border-radius:17px;padding:13px;background:#0a1727}.round-title{font-weight:900;margin-bottom:10px;color:var(--accent2)}
+.courts{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}.match{border:1px solid #294563;border-radius:14px;padding:12px;background:#102038}
+.court{font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px}.side{display:flex;justify-content:space-between;
+gap:8px;align-items:center;border-radius:10px;padding:9px 10px;background:#0a1626;margin:6px 0}.side.winner{outline:2px solid var(--accent);background:#0d2b21}
+.teamname{font-weight:800}.winbtn{border:1px solid #33506e;background:#172b45;color:#eaf6ff;border-radius:9px;padding:6px 8px;cursor:pointer;font-size:12px}
+.scoreline{display:flex;gap:8px;align-items:center;margin-top:9px}.score{width:72px;padding:7px 8px;border-radius:8px;border:1px solid #304b69;background:#081522;color:white}
+.tablewrap{overflow:auto;margin-top:14px}table{width:100%;border-collapse:collapse;min-width:620px}th,td{padding:11px 9px;border-bottom:1px solid var(--line);text-align:left}
+th{color:#9fb2c9;font-size:12px;text-transform:uppercase;letter-spacing:.06em}.rank{font-weight:900;color:var(--gold)}
+.badge{display:inline-block;border:1px solid #31516f;border-radius:999px;padding:4px 8px;font-size:12px;color:#d8e8f6}
+.knockout{display:grid;gap:12px;margin-top:14px}.ko-match{border:1px solid #2a4665;border-radius:15px;padding:12px;background:#0a1727}
+.champion{padding:18px;border-radius:16px;background:linear-gradient(135deg,#513c06,#1c3d2d);border:1px solid #8a6d13;text-align:center;margin-top:14px}
+.champion .cup{font-size:34px}.small{font-size:12px;color:var(--muted)}.hidden{display:none!important}
+footer{color:#66819e;text-align:center;padding:26px 0 34px;font-size:12px}
+@media(max-width:680px){.wrap{padding:14px}.grid,.grid3{grid-template-columns:1fr}.panel{padding:15px;border-radius:18px}.courts{grid-template-columns:1fr}}
+@media print{body{background:white;color:black}.hero,.stepper,.actions,.winbtn,.scoreline,footer{display:none!important}.panel,.round,.match{box-shadow:none;background:white;color:black;border-color:#bbb}.hint,.small,.court{color:#555}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="brand"><div class="logo">🏸</div><div><h1>MatchPoint Badminton</h1><p class="sub">Tournament manager — built for quick doubles events.</p></div></div>
+  </header>
+  <div class="stepper" id="stepper"></div>
+
+  <section class="panel" id="setupStep">
+    <h2>1. Tournament Setup</h2><div class="hint">For 2 courts, the tournament can start with just 8 players.</div>
+    <div class="grid">
+      <div><label>Number of Players</label><input id="numPlayers" class="field" type="number" min="4" max="30" value="8"></div>
+      <div><label>Number of Courts</label><select id="numCourts" class="field"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
+      <div><label>Tournament Format</label><select id="format" class="field"><option value="rotating">Rotating Partners</option><option value="fixed">Fixed Teams</option></select></div>
+      <div><label id="gamesLabel">Games Per Player</label><input id="gamesTarget" class="field" type="number" min="1" max="20" value="6"></div>
+    </div>
+    <div id="setupError" class="error hidden"></div>
+    <div class="actions"><button class="btn primary" id="toNames">Enter Player Names →</button></div>
+  </section>
+
+  <section class="panel hidden" id="namesStep">
+    <h2>2. Player Names</h2><div class="hint" id="namesHint"></div>
+    <div class="names" id="namesGrid"></div>
+    <div id="namesError" class="error hidden"></div>
+    <div class="actions"><button class="btn secondary backSetup">← Back</button><button class="btn primary" id="generate">Generate Tournament →</button></div>
+  </section>
+
+  <section class="panel hidden" id="leagueStep">
+    <h2>3. League Matches</h2><div class="hint" id="leagueInfo"></div>
+    <div class="stats" id="stats"></div>
+    <div class="schedule" id="schedule"></div>
+    <div class="actions"><button class="btn secondary" id="rerandom">↻ Re-randomize Schedule</button><button class="btn primary" id="toLeaderboard">View Leaderboard →</button></div>
+  </section>
+
+  <section class="panel hidden" id="leaderboardStep">
+    <h2>4. Leaderboard</h2><div class="hint">Ranked by wins, then point difference, then points scored.</div>
+    <div class="tablewrap"><table><thead id="lbHead"></thead><tbody id="lbBody"></tbody></table></div>
+    <div class="actions"><button class="btn secondary" id="backLeague">← Matches</button><button class="btn primary" id="startKO">Start Knockout →</button></div>
+  </section>
+
+  <section class="panel hidden" id="knockoutStep">
+    <h2>5. Knockout</h2><div class="hint" id="koHint"></div>
+    <div class="knockout" id="koArea"></div>
+    <div id="championArea"></div>
+    <div class="actions"><button class="btn secondary" id="backLB">← Leaderboard</button><button class="btn primary" id="toCost">Cost Split →</button></div>
+  </section>
+
+  <section class="panel hidden" id="costStep">
+    <h2>6. Cost Split</h2><div class="hint">Add the total costs and split equally across all players.</div>
+    <div class="grid">
+      <div><label>Court Cost (₹)</label><input id="courtCost" class="field" type="number" min="0" value="0"></div>
+      <div><label>Shuttle / Other Cost (₹)</label><input id="otherCost" class="field" type="number" min="0" value="0"></div>
+    </div>
+    <div class="stats" id="costStats"></div>
+    <div class="actions"><button class="btn secondary" id="backKO">← Knockout</button><button class="btn secondary" onclick="window.print()">Print</button><button class="btn danger" id="restart">New Tournament</button></div>
+  </section>
+
+  <footer>MatchPoint Badminton • Your tournament data stays in this browser.</footer>
+</div>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const steps=["Setup","Names","League","Leaderboard","Knockout","Cost"];
+const panels=["setupStep","namesStep","leagueStep","leaderboardStep","knockoutStep","costStep"];
+let state={players:[],courts:2,format:"rotating",target:6,schedule:[],results:{},scores:{},ko:null};
+const KEY="matchpoint_varun_v1";
+
+function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+function load(){try{const x=JSON.parse(localStorage.getItem(KEY)); if(x&&x.players) state=x}catch(e){}}
+function show(i){panels.forEach((p,j)=>$(p).classList.toggle("hidden",i!==j)); $("stepper").innerHTML=steps.map((s,j)=>`<div class="stepchip ${j===i?"active":""}">${j+1}. ${s}</div>`).join(""); window.scrollTo({top:0,behavior:"smooth"})}
+function err(id,msg){const el=$(id);el.textContent=msg;el.classList.toggle("hidden",!msg)}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function keyPair(a,b){return a<b?`${a}|${b}`:`${b}|${a}`}
+function minPlayers(c){return c*4}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+
+$("format").onchange=()=>{$("gamesLabel").textContent=$("format").value==="rotating"?"Games Per Player":"Games Per Team"};
+$("toNames").onclick=()=>{
+  const n=+$("numPlayers").value,c=+$("numCourts").value,f=$("format").value,t=+$("gamesTarget").value;
+  if(!Number.isInteger(n)||n<4||n>30)return err("setupError","Players must be between 4 and 30.");
+  if(n<minPlayers(c))return err("setupError",`Need at least ${minPlayers(c)} players to run ${c} court${c>1?"s":""}. For 2 courts, 8 players is enough.`);
+  if(f==="fixed"&&n%2)return err("setupError","Fixed Teams needs an even number of players.");
+  if(!Number.isInteger(t)||t<1||t>20)return err("setupError","Games target must be between 1 and 20.");
+  err("setupError",""); state.courts=c;state.format=f;state.target=t;
+  const old=state.players.slice();state.players=Array.from({length:n},(_,i)=>old[i]||`Player ${i+1}`);
+  renderNames();show(1)
+};
+function renderNames(){
+  $("namesHint").textContent=state.format==="fixed"?"Teams will be paired as 1+2, 3+4, 5+6...":"Partners rotate during league matches.";
+  $("namesGrid").innerHTML=state.players.map((p,i)=>`<div class="namebox"><div class="num">${i+1}</div><input class="field pname" data-i="${i}" value="${esc(p)}"></div>`).join("")
+}
+document.querySelectorAll(".backSetup").forEach(b=>b.onclick=()=>show(0));
+$("generate").onclick=()=>{
+  const vals=[...document.querySelectorAll(".pname")].map(x=>x.value.trim());
+  if(vals.some(x=>!x))return err("namesError","Please enter every player name.");
+  if(new Set(vals.map(x=>x.toLowerCase())).size!==vals.length)return err("namesError","Player names must be unique.");
+  err("namesError","");state.players=vals;state.results={};state.scores={};state.ko=null;
+  state.schedule=state.format==="rotating"?makeRotating():makeFixed();
+  if(!state.schedule.length)return err("namesError","Could not create a balanced schedule. Try a slightly different games target.");
+  save();renderLeague();show(2)
+};
+
+function chooseCaps(count,target,slotsPerMatch){
+  const matches=Math.ceil(count*target/slotsPerMatch),total=matches*slotsPerMatch,extras=total-count*target;
+  const caps=Array(count).fill(target);shuffle([...Array(count).keys()]).slice(0,extras).forEach(i=>caps[i]++);return caps
+}
+function bestPartition(selected,partnerCount,oppCount){
+  let best=null,bestScore=Infinity;
+  for(let a=0;a<350;a++){
+    const s=shuffle(selected),games=[];let score=0;
+    for(let i=0;i<s.length;i+=4){
+      const x=s.slice(i,i+4); if(x.length<4)continue;
+      const pairings=[[[x[0],x[1]],[x[2],x[3]]],[[x[0],x[2]],[x[1],x[3]]],[[x[0],x[3]],[x[1],x[2]]]];
+      let bp=null,bs=Infinity;
+      for(const g of pairings){
+        let sc=(partnerCount[keyPair(...g[0])]||0)*30+(partnerCount[keyPair(...g[1])]||0)*30;
+        for(const u of g[0])for(const v of g[1])sc+=(oppCount[keyPair(u,v)]||0)*3;
+        sc+=Math.random()*2;if(sc<bs){bs=sc;bp=g}
+      }
+      games.push(bp);score+=bs
+    }
+    if(score<bestScore){bestScore=score;best=games}
+  }
+  return best||[]
+}
+function tryRotating(){
+  const n=state.players.length,c=state.courts,target=state.target,caps=chooseCaps(n,target,4);
+  const gp=Array(n).fill(0),partner={},opp={}; const rounds=[];let id=0;
+  for(let guard=0;guard<300;guard++){
+    const rem=gp.map((g,i)=>({i,r:caps[i]-g})).filter(x=>x.r>0);
+    if(!rem.length)break;
+    const k=Math.min(c*4,Math.floor(rem.length/4)*4); if(k<4)return null;
+    let selected=null;
+    for(let trial=0;trial<100;trial++){
+      const candidate=shuffle(rem).sort((a,b)=>(b.r-a.r)+(Math.random()-.5)*.35).slice(0,k).map(x=>x.i);
+      if(candidate.length===k){selected=candidate;break}
+    }
+    if(!selected)return null;
+    const games=bestPartition(selected,partner,opp),round=[];
+    games.forEach((g,ci)=>{
+      const [A,B]=g;A.forEach(x=>gp[x]++);B.forEach(x=>gp[x]++);
+      partner[keyPair(A[0],A[1])]=(partner[keyPair(A[0],A[1])]||0)+1;
+      partner[keyPair(B[0],B[1])]=(partner[keyPair(B[0],B[1])]||0)+1;
+      A.forEach(u=>B.forEach(v=>opp[keyPair(u,v)]=(opp[keyPair(u,v)]||0)+1));
+      round.push({id:`L${id++}`,court:ci+1,a:A,b:B})
+    });rounds.push(round)
+  }
+  return gp.every((g,i)=>g===caps[i])?rounds:null
+}
+function makeRotating(){
+  let best=null,bestPenalty=Infinity;
+  for(let a=0;a<80;a++){
+    const r=tryRotating();if(!r)continue;
+    const pc={};r.flat().forEach(m=>[m.a,m.b].forEach(t=>{const k=keyPair(t[0],t[1]);pc[k]=(pc[k]||0)+1}));
+    const penalty=Object.values(pc).reduce((s,v)=>s+Math.max(0,v-1)*10,0);
+    if(penalty<bestPenalty){bestPenalty=penalty;best=r;if(penalty===0)break}
+  }return best||[]
+}
+function tryFixed(){
+  const teams=Array.from({length:state.players.length/2},(_,i)=>i),c=state.courts,target=state.target,caps=chooseCaps(teams.length,target,2);
+  const gp=Array(teams.length).fill(0),opp={},rounds=[];let id=0;
+  for(let guard=0;guard<300;guard++){
+    const rem=gp.map((g,i)=>({i,r:caps[i]-g})).filter(x=>x.r>0);if(!rem.length)break;
+    const k=Math.min(c*2,Math.floor(rem.length/2)*2);if(k<2)return null;
+    const selected=shuffle(rem).sort((a,b)=>(b.r-a.r)+(Math.random()-.5)*.4).slice(0,k).map(x=>x.i);
+    let best=null,bs=Infinity;
+    for(let t=0;t<250;t++){
+      const s=shuffle(selected),pairs=[],sc=s.reduce((acc,_,i)=>i%2?acc+(opp[keyPair(s[i-1],s[i])]||0)*10+Math.random():acc,0);
+      for(let i=0;i<s.length;i+=2)pairs.push([s[i],s[i+1]]);
+      if(sc<bs){bs=sc;best=pairs}
+    }
+    const round=[];(best||[]).forEach((p,ci)=>{gp[p[0]]++;gp[p[1]]++;opp[keyPair(...p)]=(opp[keyPair(...p)]||0)+1;
+      round.push({id:`L${id++}`,court:ci+1,a:p[0],b:p[1]})});rounds.push(round)
+  }
+  return gp.every((g,i)=>g===caps[i])?rounds:null
+}
+function makeFixed(){for(let a=0;a<50;a++){const r=tryFixed();if(r)return r}return[]}
+function fixedTeam(i){return [2*i,2*i+1]}
+function teamText(side){
+  if(state.format==="fixed"){const t=fixedTeam(side);return `${state.players[t[0]]} + ${state.players[t[1]]}`}
+  return `${state.players[side[0]]} + ${state.players[side[1]]}`
+}
+function renderLeague(){
+  const total=state.schedule.flat().length,done=Object.keys(state.results).filter(k=>k.startsWith("L")).length;
+  $("leagueInfo").textContent=`${state.players.length} players • ${state.courts} court${state.courts>1?"s":""} • ${state.format==="rotating"?"Rotating partners":"Fixed teams"} • ${state.target} games target`;
+  $("stats").innerHTML=`<div class="stat"><b>${state.schedule.length}</b> rounds</div><div class="stat"><b>${total}</b> matches</div><div class="stat"><b>${done}</b> results entered</div>`;
+  $("schedule").innerHTML=state.schedule.map((r,ri)=>`<div class="round"><div class="round-title">Round ${ri+1}</div><div class="courts">${r.map(renderMatch).join("")}</div></div>`).join("")
+}
+function renderMatch(m){
+  const res=state.results[m.id],score=state.scores[m.id]||["",""],A=teamText(m.a),B=teamText(m.b);
+  return `<div class="match"><div class="court">Court ${m.court}</div>
+    <div class="side ${res==="a"?"winner":""}"><span class="teamname">${esc(A)}</span><button class="winbtn" data-win="${m.id}:a">Winner</button></div>
+    <div class="side ${res==="b"?"winner":""}"><span class="teamname">${esc(B)}</span><button class="winbtn" data-win="${m.id}:b">Winner</button></div>
+    <div class="scoreline"><span class="small">Score</span><input class="score" data-score="${m.id}:0" type="number" min="0" value="${score[0]}"><span>–</span><input class="score" data-score="${m.id}:1" type="number" min="0" value="${score[1]}"></div></div>`
+}
+document.addEventListener("click",e=>{
+  const w=e.target.closest("[data-win]");if(w){const [id,side]=w.dataset.win.split(":");state.results[id]=side;save();renderLeague()}
+  const kw=e.target.closest("[data-kowin]");if(kw){setKOWinner(...kw.dataset.kowin.split(":"))}
+});
+document.addEventListener("change",e=>{
+  if(e.target.matches("[data-score]")){const [id,idx]=e.target.dataset.score.split(":");const s=state.scores[id]||["",""];s[+idx]=e.target.value;state.scores[id]=s;save()}
+});
+$("rerandom").onclick=()=>{state.schedule=state.format==="rotating"?makeRotating():makeFixed();state.results={};state.scores={};state.ko=null;save();renderLeague()};
+function standings(){
+  if(state.format==="rotating"){
+    const rows=state.players.map((name,i)=>({id:i,name,p:0,w:0,l:0,pf:0,pa:0}));
+    state.schedule.flat().forEach(m=>{const r=state.results[m.id];if(!r)return;const A=m.a,B=m.b,w=r==="a"?A:B,l=r==="a"?B:A;[...A,...B].forEach(i=>rows[i].p++);
+      w.forEach(i=>rows[i].w++);l.forEach(i=>rows[i].l++);
+      const sc=state.scores[m.id]||[];if(sc[0]!==""&&sc[1]!==""){const a=+sc[0],b=+sc[1];A.forEach(i=>{rows[i].pf+=a;rows[i].pa+=b});B.forEach(i=>{rows[i].pf+=b;rows[i].pa+=a})}
+    });return rows.sort((a,b)=>b.w-a.w||((b.pf-b.pa)-(a.pf-a.pa))||b.pf-a.pf||a.name.localeCompare(b.name))
+  }else{
+    const tc=state.players.length/2,rows=Array.from({length:tc},(_,i)=>({id:i,name:teamText(i),p:0,w:0,l:0,pf:0,pa:0}));
+    state.schedule.flat().forEach(m=>{const r=state.results[m.id];if(!r)return;rows[m.a].p++;rows[m.b].p++;const w=r==="a"?m.a:m.b,l=r==="a"?m.b:m.a;rows[w].w++;rows[l].l++;
+      const sc=state.scores[m.id]||[];if(sc[0]!==""&&sc[1]!==""){rows[m.a].pf+=+sc[0];rows[m.a].pa+=+sc[1];rows[m.b].pf+=+sc[1];rows[m.b].pa+=+sc[0]}
+    });return rows.sort((a,b)=>b.w-a.w||((b.pf-b.pa)-(a.pf-a.pa))||b.pf-a.pf)
+  }
+}
+function renderLB(){
+  const s=standings();$("lbHead").innerHTML="<tr><th>#</th><th>"+(state.format==="rotating"?"Player":"Team")+"</th><th>P</th><th>W</th><th>L</th><th>PF</th><th>PA</th><th>+/-</th></tr>";
+  $("lbBody").innerHTML=s.map((x,i)=>`<tr><td class="rank">${i+1}</td><td><b>${esc(x.name)}</b></td><td>${x.p}</td><td>${x.w}</td><td>${x.l}</td><td>${x.pf}</td><td>${x.pa}</td><td>${x.pf-x.pa}</td></tr>`).join("");
+  const enough=state.format==="rotating"?state.players.length>=8:state.players.length/2>=4;$("startKO").disabled=!enough
+}
+$("toLeaderboard").onclick=()=>{renderLB();show(3)};$("backLeague").onclick=()=>{renderLeague();show(2)};
+function createKO(){
+  const s=standings();
+  if(state.format==="fixed"){
+    const top=s.slice(0,4).map(x=>x.id);return {teams:top.map(t=>({label:teamText(t),members:fixedTeam(t)})),semis:[{a:0,b:3,id:"S0"},{a:1,b:2,id:"S1"}],semiWinners:[null,null],final:null,champ:null}
+  }else{
+    const top=s.slice(0,8).map(x=>x.id),pairs=[[top[0],top[7]],[top[1],top[6]],[top[2],top[5]],[top[3],top[4]]];
+    return {teams:pairs.map(p=>({label:`${state.players[p[0]]} + ${state.players[p[1]]}`,members:p})),semis:[{a:0,b:3,id:"S0"},{a:1,b:2,id:"S1"}],semiWinners:[null,null],final:null,champ:null}
+  }
+}
+$("startKO").onclick=()=>{state.ko=createKO();save();renderKO();show(4)};
+function setKOWinner(id,side){
+  const k=state.ko;if(!k)return;
+  if(id==="S0"||id==="S1"){const i=id==="S0"?0:1,m=k.semis[i];k.semiWinners[i]=side==="a"?m.a:m.b;if(k.semiWinners[0]!=null&&k.semiWinners[1]!=null)k.final={a:k.semiWinners[0],b:k.semiWinners[1],id:"F0"}}
+  else if(id==="F0"&&k.final)k.champ=side==="a"?k.final.a:k.final.b;
+  save();renderKO()
+}
+function koCard(m,title){
+  const k=state.ko,A=k.teams[m.a].label,B=k.teams[m.b].label;
+  let wa=false,wb=false;if(m.id==="F0"&&k.champ!=null){wa=k.champ===m.a;wb=k.champ===m.b}else if(m.id.startsWith("S")){const i=m.id==="S0"?0:1;wa=k.semiWinners[i]===m.a;wb=k.semiWinners[i]===m.b}
+  return `<div class="ko-match"><div class="court">${title}</div><div class="side ${wa?"winner":""}"><b>${esc(A)}</b><button class="winbtn" data-kowin="${m.id}:a">Winner</button></div><div class="side ${wb?"winner":""}"><b>${esc(B)}</b><button class="winbtn" data-kowin="${m.id}:b">Winner</button></div></div>`
+}
+function renderKO(){
+  const k=state.ko;if(!k)return;$("koHint").textContent=state.format==="rotating"?"Top 8 players are paired into 4 balanced knockout teams.":"Top 4 league teams qualify for the semifinals.";
+  let h=k.semis.map((m,i)=>koCard(m,`Semifinal ${i+1}`)).join("");if(k.final)h+=koCard(k.final,"Final");$("koArea").innerHTML=h;
+  $("championArea").innerHTML=k.champ!=null?`<div class="champion"><div class="cup">🏆</div><div class="small">CHAMPION</div><h2>${esc(k.teams[k.champ].label)}</h2></div>`:""
+}
+$("backLB").onclick=()=>{renderLB();show(3)};$("toCost").onclick=()=>{renderCost();show(5)};$("backKO").onclick=()=>{renderKO();show(4)};
+function renderCost(){
+  const a=+$("courtCost").value||0,b=+$("otherCost").value||0,total=a+b,each=state.players.length?total/state.players.length:0;
+  $("costStats").innerHTML=`<div class="stat">Total: <b>₹${total.toFixed(2)}</b></div><div class="stat">Players: <b>${state.players.length}</b></div><div class="stat">Per player: <b>₹${each.toFixed(2)}</b></div>`
+}
+$("courtCost").oninput=renderCost;$("otherCost").oninput=renderCost;
+$("restart").onclick=()=>{if(confirm("Start a new tournament? Current saved tournament will be cleared.")){localStorage.removeItem(KEY);location.reload()}};
+
+load();
+if(state.players.length&&state.schedule.length){renderLeague();show(2)}else show(0);
+})();
+</script>
+</body>
+</html>
