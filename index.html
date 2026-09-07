@@ -39,6 +39,14 @@ gap:8px;align-items:center;border-radius:10px;padding:9px 10px;background:#0a162
 .tablewrap{overflow:auto;margin-top:14px}table{width:100%;border-collapse:collapse;min-width:620px}th,td{padding:11px 9px;border-bottom:1px solid var(--line);text-align:left}
 th{color:#9fb2c9;font-size:12px;text-transform:uppercase;letter-spacing:.06em}.rank{font-weight:900;color:var(--gold)}
 .badge{display:inline-block;border:1px solid #31516f;border-radius:999px;padding:4px 8px;font-size:12px;color:#d8e8f6}
+
+.draw-status{margin:14px 0;padding:12px;border:1px solid var(--line);border-radius:14px;background:#0a1727}
+.draw-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:10px;margin:14px 0}
+.draw-card{min-height:112px;border:1px solid #31516f;border-radius:16px;background:linear-gradient(145deg,#17304c,#0c1a2b);color:white;display:grid;place-items:center;font-weight:900;font-size:22px;cursor:pointer;box-shadow:0 10px 24px rgba(0,0,0,.18)}
+.draw-card:hover{border-color:var(--accent)}.draw-card.picked{cursor:default;background:#0d2b21;border-color:var(--accent);color:var(--accent2)}
+.draw-card small{display:block;font-size:11px;color:var(--muted);margin-top:4px}.draw-log{display:grid;gap:7px;margin-top:12px}
+.draw-log-row{display:flex;justify-content:space-between;gap:12px;background:#0a1727;border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.draw-teams{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:14px}.draw-team{border:1px solid #31516f;border-radius:14px;padding:12px;background:#102038}
 .knockout{display:grid;gap:12px;margin-top:14px}.ko-match{border:1px solid #2a4665;border-radius:15px;padding:12px;background:#0a1727}
 .champion{padding:18px;border-radius:16px;background:linear-gradient(135deg,#513c06,#1c3d2d);border:1px solid #8a6d13;text-align:center;margin-top:14px}
 .champion .cup{font-size:34px}.small{font-size:12px;color:var(--muted)}.hidden{display:none!important}
@@ -86,15 +94,28 @@ footer{color:#66819e;text-align:center;padding:26px 0 34px;font-size:12px}
     <div class="actions"><button class="btn secondary" id="backLeague">← Matches</button><button class="btn primary" id="startKO">Start Knockout →</button></div>
   </section>
 
+  <section class="panel hidden" id="drawStep">
+    <h2>5. Lucky Draw — Pick a Card</h2><div class="hint" id="drawHint">Qualified players pick hidden cards. Matching cards become partners.</div>
+    <div class="draw-status" id="drawStatus"></div>
+    <div class="draw-cards" id="drawCards"></div>
+    <div class="draw-log" id="drawLog"></div>
+    <div class="draw-teams" id="drawTeams"></div>
+    <div class="actions">
+      <button class="btn secondary" id="drawBack">← Leaderboard</button>
+      <button class="btn secondary" id="drawRestart">↻ Restart Draw</button>
+      <button class="btn primary" id="drawContinue" disabled>Start Knockout →</button>
+    </div>
+  </section>
+
   <section class="panel hidden" id="knockoutStep">
-    <h2>5. Knockout</h2><div class="hint" id="koHint"></div>
+    <h2>6. Knockout</h2><div class="hint" id="koHint"></div>
     <div class="knockout" id="koArea"></div>
     <div id="championArea"></div>
     <div class="actions"><button class="btn secondary" id="backLB">← Leaderboard</button><button class="btn primary" id="toCost">Cost Split →</button></div>
   </section>
 
   <section class="panel hidden" id="costStep">
-    <h2>6. Cost Split</h2><div class="hint">Add the total costs and split equally across all players.</div>
+    <h2>7. Cost Split</h2><div class="hint">Add the total costs and split equally across all players.</div>
     <div class="grid">
       <div><label>Court Cost (₹)</label><input id="courtCost" class="field" type="number" min="0" value="0"></div>
       <div><label>Shuttle / Other Cost (₹)</label><input id="otherCost" class="field" type="number" min="0" value="0"></div>
@@ -109,13 +130,13 @@ footer{color:#66819e;text-align:center;padding:26px 0 34px;font-size:12px}
 (()=>{
 "use strict";
 const $=id=>document.getElementById(id);
-const steps=["Setup","Names","League","Leaderboard","Knockout","Cost"];
-const panels=["setupStep","namesStep","leagueStep","leaderboardStep","knockoutStep","costStep"];
-let state={players:[],courts:2,format:"rotating",target:6,schedule:[],results:{},scores:{},ko:null};
+const steps=["Setup","Names","League","Leaderboard","Lucky Draw","Knockout","Cost"];
+const panels=["setupStep","namesStep","leagueStep","leaderboardStep","drawStep","knockoutStep","costStep"];
+let state={players:[],courts:2,format:"rotating",target:6,schedule:[],results:{},scores:{},draw:null,ko:null};
 const KEY="matchpoint_varun_v1";
 
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
-function load(){try{const x=JSON.parse(localStorage.getItem(KEY)); if(x&&x.players) state=x}catch(e){}}
+function load(){try{const x=JSON.parse(localStorage.getItem(KEY)); if(x&&x.players) state={...state,...x}}catch(e){}}
 function show(i){panels.forEach((p,j)=>$(p).classList.toggle("hidden",i!==j)); $("stepper").innerHTML=steps.map((s,j)=>`<div class="stepchip ${j===i?"active":""}">${j+1}. ${s}</div>`).join(""); window.scrollTo({top:0,behavior:"smooth"})}
 function err(id,msg){const el=$(id);el.textContent=msg;el.classList.toggle("hidden",!msg)}
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
@@ -143,7 +164,7 @@ $("generate").onclick=()=>{
   const vals=[...document.querySelectorAll(".pname")].map(x=>x.value.trim());
   if(vals.some(x=>!x))return err("namesError","Please enter every player name.");
   if(new Set(vals.map(x=>x.toLowerCase())).size!==vals.length)return err("namesError","Player names must be unique.");
-  err("namesError","");state.players=vals;state.results={};state.scores={};state.ko=null;
+  err("namesError","");state.players=vals;state.results={};state.scores={};state.draw=null;state.ko=null;
   state.schedule=state.format==="rotating"?makeRotating():makeFixed();
   if(!state.schedule.length)return err("namesError","Could not create a balanced schedule. Try a slightly different games target.");
   save();renderLeague();show(2)
@@ -265,7 +286,7 @@ document.addEventListener("change",e=>{
     save();renderLeague();
   }
 });
-$("rerandom").onclick=()=>{state.schedule=state.format==="rotating"?makeRotating():makeFixed();state.results={};state.scores={};state.ko=null;save();renderLeague()};
+$("rerandom").onclick=()=>{state.schedule=state.format==="rotating"?makeRotating():makeFixed();state.results={};state.scores={};state.draw=null;state.ko=null;save();renderLeague()};
 function standings(){
   if(state.format==="rotating"){
     const rows=state.players.map((name,i)=>({id:i,name,p:0,w:0,l:0,pts:0,pf:0,pa:0}));
@@ -304,20 +325,62 @@ function renderLB(){
   $("lbHead").innerHTML="<tr><th>#</th><th>"+(state.format==="rotating"?"Player":"Team")+"</th><th>P</th><th>W</th><th>L</th><th>Pts</th><th>PF</th><th>PA</th><th>+/-</th></tr>";
   $("lbBody").innerHTML=s.map((x,i)=>`<tr><td class="rank">${i+1}</td><td><b>${esc(x.name)}</b></td><td>${x.p}</td><td>${x.w}</td><td>${x.l}</td><td><b>${x.pts}</b></td><td>${x.pf}</td><td>${x.pa}</td><td>${x.pf-x.pa>0?"+":""}${x.pf-x.pa}</td></tr>`).join("");
   const matches=state.schedule.flat(),done=matches.filter(m=>getResolvedResult(m)).length;
-  const enough=state.format==="rotating"?state.players.length>=8:state.players.length/2>=4;
-  $("startKO").disabled=!enough||done< matches.length;
+  const enough=state.format==="rotating"?state.players.length>=4:state.players.length/2>=4;
+  $("startKO").disabled=!enough||done<matches.length;
+  $("startKO").textContent=state.format==="rotating"?"Lucky Draw →":"Start Knockout →";
 }
 $("toLeaderboard").onclick=()=>{renderLB();show(3)};$("backLeague").onclick=()=>{renderLeague();show(2)};
-function createKO(){
-  const s=standings();
-  if(state.format==="fixed"){
-    const top=s.slice(0,4).map(x=>x.id);return {teams:top.map(t=>({label:teamText(t),members:fixedTeam(t)})),semis:[{a:0,b:3,id:"S0"},{a:1,b:2,id:"S1"}],semiWinners:[null,null],final:null,champ:null}
-  }else{
-    const top=s.slice(0,8).map(x=>x.id),pairs=[[top[0],top[7]],[top[1],top[6]],[top[2],top[5]],[top[3],top[4]]];
-    return {teams:pairs.map(p=>({label:`${state.players[p[0]]} + ${state.players[p[1]]}`,members:p})),semis:[{a:0,b:3,id:"S0"},{a:1,b:2,id:"S1"}],semiWinners:[null,null],final:null,champ:null}
-  }
+
+function qualifierCount(){ return state.players.length>=8?8:4; }
+function makeDrawCards(n){
+  const cards=[];for(let i=1;i<=n/2;i++){cards.push(`T${i}`,`T${i}`)}return shuffle(cards).map((label,i)=>({id:i,label,pickedBy:null}));
 }
-$("startKO").onclick=()=>{state.ko=createKO();save();renderKO();show(4)};
+function initLuckyDraw(force=false){
+  const q=qualifierCount(),qualified=standings().slice(0,q).map(x=>x.id);
+  if(!force&&state.draw&&state.draw.qualified&&state.draw.qualified.length===q&&state.draw.qualified.every((x,i)=>x===qualified[i]))return;
+  state.draw={qualified,cards:makeDrawCards(q),turn:0,picks:[],complete:false};state.ko=null;save();
+}
+function renderLuckyDraw(){
+  initLuckyDraw(false);const d=state.draw,q=d.qualified.length;
+  $("drawHint").textContent=`Top ${q} players qualified. Cards are ${Array.from({length:q/2},(_,i)=>`T${i+1} × 2`).join(", ")}. Same card = same team.`;
+  if(d.complete){
+    $("drawStatus").innerHTML=`<b>Draw complete.</b> All ${q} players have picked a card.`;
+  }else{
+    const pid=d.qualified[d.turn],rank=d.turn+1;
+    $("drawStatus").innerHTML=`<b>#${rank} ${esc(state.players[pid])}</b> — pick any hidden card.`;
+  }
+  $("drawCards").innerHTML=d.cards.map((c,i)=>{
+    if(c.pickedBy==null)return `<button class="draw-card" data-draw-card="${i}"><span>?</span></button>`;
+    return `<div class="draw-card picked"><span>${c.label}<small>${esc(state.players[c.pickedBy])}</small></span></div>`;
+  }).join("");
+  $("drawLog").innerHTML=d.picks.length?d.picks.map((p,i)=>`<div class="draw-log-row"><span>#${i+1} ${esc(state.players[p.player])}</span><b>${p.label}</b></div>`).join(""):'';
+  const groups={};d.picks.forEach(p=>(groups[p.label]??=[]).push(p.player));
+  $("drawTeams").innerHTML=d.complete?Object.keys(groups).sort().map(label=>`<div class="draw-team"><b>${label}</b><div>${groups[label].map(id=>esc(state.players[id])).join(" + ")}</div></div>`).join(""):'';
+  $("drawContinue").disabled=!d.complete;
+}
+function handleDrawCard(i){
+  const d=state.draw;if(!d||d.complete)return;const card=d.cards[i];if(!card||card.pickedBy!=null)return;
+  const player=d.qualified[d.turn];card.pickedBy=player;d.picks.push({player,label:card.label});d.turn++;d.complete=d.turn>=d.qualified.length;save();renderLuckyDraw();
+}
+function createKOFixed(){
+  const top=standings().slice(0,4).map(x=>x.id);
+  return {teams:top.map(t=>({label:teamText(t),members:fixedTeam(t)})),semis:[{a:0,b:3,id:"S0"},{a:1,b:2,id:"S1"}],semiWinners:[null,null],final:null,champ:null,directFinal:false};
+}
+function createKOFromDraw(){
+  const d=state.draw,groups={};d.picks.forEach(p=>(groups[p.label]??=[]).push(p.player));
+  const labels=Object.keys(groups).sort((a,b)=>Number(a.slice(1))-Number(b.slice(1)));
+  const teams=labels.map(label=>({label:`${label}: ${groups[label].map(id=>state.players[id]).join(" + ")}`,members:groups[label],drawLabel:label}));
+  if(teams.length===2)return {teams,semis:[],semiWinners:[],final:{a:0,b:1,id:"F0"},champ:null,directFinal:true};
+  return {teams,semis:[{a:0,b:3,id:"S0"},{a:1,b:2,id:"S1"}],semiWinners:[null,null],final:null,champ:null,directFinal:false};
+}
+$("startKO").onclick=()=>{
+  if(state.format==="rotating"){initLuckyDraw(false);renderLuckyDraw();show(4)}
+  else{state.ko=createKOFixed();save();renderKO();show(5)}
+};
+$("drawBack").onclick=()=>{renderLB();show(3)};
+$("drawRestart").onclick=()=>{initLuckyDraw(true);renderLuckyDraw()};
+$("drawContinue").onclick=()=>{if(!state.draw||!state.draw.complete)return;state.ko=createKOFromDraw();save();renderKO();show(5)};
+document.addEventListener("click",e=>{const c=e.target.closest("[data-draw-card]");if(c)handleDrawCard(+c.dataset.drawCard)});
 function setKOWinner(id,side){
   const k=state.ko;if(!k)return;
   if(id==="S0"||id==="S1"){const i=id==="S0"?0:1,m=k.semis[i];k.semiWinners[i]=side==="a"?m.a:m.b;if(k.semiWinners[0]!=null&&k.semiWinners[1]!=null)k.final={a:k.semiWinners[0],b:k.semiWinners[1],id:"F0"}}
@@ -330,11 +393,15 @@ function koCard(m,title){
   return `<div class="ko-match"><div class="court">${title}</div><div class="side ${wa?"winner":""}"><b>${esc(A)}</b><button class="winbtn" data-kowin="${m.id}:a">Winner</button></div><div class="side ${wb?"winner":""}"><b>${esc(B)}</b><button class="winbtn" data-kowin="${m.id}:b">Winner</button></div></div>`
 }
 function renderKO(){
-  const k=state.ko;if(!k)return;$("koHint").textContent=state.format==="rotating"?"Top 8 players are paired into 4 balanced knockout teams.":"Top 4 league teams qualify for the semifinals.";
-  let h=k.semis.map((m,i)=>koCard(m,`Semifinal ${i+1}`)).join("");if(k.final)h+=koCard(k.final,"Final");$("koArea").innerHTML=h;
-  $("championArea").innerHTML=k.champ!=null?`<div class="champion"><div class="cup">🏆</div><div class="small">CHAMPION</div><h2>${esc(k.teams[k.champ].label)}</h2></div>`:""
+  const k=state.ko;if(!k)return;
+  if(state.format==="rotating")$("koHint").textContent=k.directFinal?"Lucky Draw formed 2 teams. Winner takes the final.":"Lucky Draw formed 4 teams. T1 vs T4 and T2 vs T3 in the semifinals.";
+  else $("koHint").textContent="Top 4 league teams qualify for the semifinals.";
+  let h=(k.semis||[]).map((m,i)=>koCard(m,`Semifinal ${i+1}`)).join("");if(k.final)h+=koCard(k.final,"Final");$("koArea").innerHTML=h;
+  $("championArea").innerHTML=k.champ!=null?`<div class="champion"><div class="cup">🏆</div><div class="small">CHAMPION</div><h2>${esc(k.teams[k.champ].label)}</h2></div>`:"";
+  $("backLB").textContent=state.format==="rotating"?"← Lucky Draw":"← Leaderboard";
 }
-$("backLB").onclick=()=>{renderLB();show(3)};$("toCost").onclick=()=>{renderCost();show(5)};$("backKO").onclick=()=>{renderKO();show(4)};
+$("backLB").onclick=()=>{if(state.format==="rotating"){renderLuckyDraw();show(4)}else{renderLB();show(3)}};
+$("toCost").onclick=()=>{renderCost();show(6)};$("backKO").onclick=()=>{renderKO();show(5)};
 function renderCost(){
   const a=+$("courtCost").value||0,b=+$("otherCost").value||0,total=a+b,each=state.players.length?total/state.players.length:0;
   $("costStats").innerHTML=`<div class="stat">Total: <b>₹${total.toFixed(2)}</b></div><div class="stat">Players: <b>${state.players.length}</b></div><div class="stat">Per player: <b>₹${each.toFixed(2)}</b></div>`
