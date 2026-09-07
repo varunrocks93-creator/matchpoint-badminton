@@ -81,7 +81,7 @@ footer{color:#66819e;text-align:center;padding:26px 0 34px;font-size:12px}
   </section>
 
   <section class="panel hidden" id="leaderboardStep">
-    <h2>4. Leaderboard</h2><div class="hint">Ranked by wins, then point difference, then points scored.</div>
+    <h2>4. Leaderboard</h2><div class="hint">1 league point per win. Ranked by Pts, then point difference (+/-), then points scored (PF).</div>
     <div class="tablewrap"><table><thead id="lbHead"></thead><tbody id="lbBody"></tbody></table></div>
     <div class="actions"><button class="btn secondary" id="backLeague">← Matches</button><button class="btn primary" id="startKO">Start Knockout →</button></div>
   </section>
@@ -229,14 +229,20 @@ function teamText(side){
   if(state.format==="fixed"){const t=fixedTeam(side);return `${state.players[t[0]]} + ${state.players[t[1]]}`}
   return `${state.players[side[0]]} + ${state.players[side[1]]}`
 }
+function getResolvedResult(m){
+  const sc=state.scores[m.id]||["",""];
+  const hasScores=sc[0]!==""&&sc[1]!==""&&!isNaN(+sc[0])&&!isNaN(+sc[1]);
+  if(hasScores) return +sc[0]===+sc[1]?null:(+sc[0]>+sc[1]?"a":"b");
+  return state.results[m.id]||null;
+}
 function renderLeague(){
-  const total=state.schedule.flat().length,done=Object.keys(state.results).filter(k=>k.startsWith("L")).length;
-  $("leagueInfo").textContent=`${state.players.length} players • ${state.courts} court${state.courts>1?"s":""} • ${state.format==="rotating"?"Rotating partners":"Fixed teams"} • ${state.target} games target`;
+  const matches=state.schedule.flat(),total=matches.length,done=matches.filter(m=>getResolvedResult(m)).length;
+  $("leagueInfo").textContent=`${state.players.length} players • ${state.courts} court${state.courts>1?"s":""} • ${state.format==="rotating"?"Rotating partners":"Fixed teams"} • ${state.target} games target • 1 point per win`;
   $("stats").innerHTML=`<div class="stat"><b>${state.schedule.length}</b> rounds</div><div class="stat"><b>${total}</b> matches</div><div class="stat"><b>${done}</b> results entered</div>`;
   $("schedule").innerHTML=state.schedule.map((r,ri)=>`<div class="round"><div class="round-title">Round ${ri+1}</div><div class="courts">${r.map(renderMatch).join("")}</div></div>`).join("")
 }
 function renderMatch(m){
-  const res=state.results[m.id],score=state.scores[m.id]||["",""],A=teamText(m.a),B=teamText(m.b);
+  const res=getResolvedResult(m),score=state.scores[m.id]||["",""],A=teamText(m.a),B=teamText(m.b);
   return `<div class="match"><div class="court">Court ${m.court}</div>
     <div class="side ${res==="a"?"winner":""}"><span class="teamname">${esc(A)}</span><button class="winbtn" data-win="${m.id}:a">Winner</button></div>
     <div class="side ${res==="b"?"winner":""}"><span class="teamname">${esc(B)}</span><button class="winbtn" data-win="${m.id}:b">Winner</button></div>
@@ -247,27 +253,59 @@ document.addEventListener("click",e=>{
   const kw=e.target.closest("[data-kowin]");if(kw){setKOWinner(...kw.dataset.kowin.split(":"))}
 });
 document.addEventListener("change",e=>{
-  if(e.target.matches("[data-score]")){const [id,idx]=e.target.dataset.score.split(":");const s=state.scores[id]||["",""];s[+idx]=e.target.value;state.scores[id]=s;save()}
+  if(e.target.matches("[data-score]")){
+    const [id,idx]=e.target.dataset.score.split(":");
+    const s=state.scores[id]||["",""];
+    s[+idx]=e.target.value;
+    state.scores[id]=s;
+    if(s[0]!==""&&s[1]!==""&&!isNaN(+s[0])&&!isNaN(+s[1])){
+      if(+s[0]===+s[1]) delete state.results[id];
+      else state.results[id]=+s[0]>+s[1]?"a":"b";
+    }
+    save();renderLeague();
+  }
 });
 $("rerandom").onclick=()=>{state.schedule=state.format==="rotating"?makeRotating():makeFixed();state.results={};state.scores={};state.ko=null;save();renderLeague()};
 function standings(){
   if(state.format==="rotating"){
-    const rows=state.players.map((name,i)=>({id:i,name,p:0,w:0,l:0,pf:0,pa:0}));
-    state.schedule.flat().forEach(m=>{const r=state.results[m.id];if(!r)return;const A=m.a,B=m.b,w=r==="a"?A:B,l=r==="a"?B:A;[...A,...B].forEach(i=>rows[i].p++);
-      w.forEach(i=>rows[i].w++);l.forEach(i=>rows[i].l++);
-      const sc=state.scores[m.id]||[];if(sc[0]!==""&&sc[1]!==""){const a=+sc[0],b=+sc[1];A.forEach(i=>{rows[i].pf+=a;rows[i].pa+=b});B.forEach(i=>{rows[i].pf+=b;rows[i].pa+=a})}
-    });return rows.sort((a,b)=>b.w-a.w||((b.pf-b.pa)-(a.pf-a.pa))||b.pf-a.pf||a.name.localeCompare(b.name))
+    const rows=state.players.map((name,i)=>({id:i,name,p:0,w:0,l:0,pts:0,pf:0,pa:0}));
+    state.schedule.flat().forEach(m=>{
+      const r=getResolvedResult(m);if(!r)return;
+      const A=m.a,B=m.b,winners=r==="a"?A:B,losers=r==="a"?B:A;
+      [...A,...B].forEach(i=>rows[i].p++);
+      winners.forEach(i=>{rows[i].w++;rows[i].pts++});
+      losers.forEach(i=>rows[i].l++);
+      const sc=state.scores[m.id]||[];
+      if(sc[0]!==""&&sc[1]!==""&&!isNaN(+sc[0])&&!isNaN(+sc[1])){
+        const a=+sc[0],b=+sc[1];
+        A.forEach(i=>{rows[i].pf+=a;rows[i].pa+=b});
+        B.forEach(i=>{rows[i].pf+=b;rows[i].pa+=a});
+      }
+    });
+    return rows.sort((a,b)=>b.pts-a.pts||((b.pf-b.pa)-(a.pf-a.pa))||b.pf-a.pf||a.l-b.l||a.name.localeCompare(b.name));
   }else{
-    const tc=state.players.length/2,rows=Array.from({length:tc},(_,i)=>({id:i,name:teamText(i),p:0,w:0,l:0,pf:0,pa:0}));
-    state.schedule.flat().forEach(m=>{const r=state.results[m.id];if(!r)return;rows[m.a].p++;rows[m.b].p++;const w=r==="a"?m.a:m.b,l=r==="a"?m.b:m.a;rows[w].w++;rows[l].l++;
-      const sc=state.scores[m.id]||[];if(sc[0]!==""&&sc[1]!==""){rows[m.a].pf+=+sc[0];rows[m.a].pa+=+sc[1];rows[m.b].pf+=+sc[1];rows[m.b].pa+=+sc[0]}
-    });return rows.sort((a,b)=>b.w-a.w||((b.pf-b.pa)-(a.pf-a.pa))||b.pf-a.pf)
+    const tc=state.players.length/2,rows=Array.from({length:tc},(_,i)=>({id:i,name:teamText(i),p:0,w:0,l:0,pts:0,pf:0,pa:0}));
+    state.schedule.flat().forEach(m=>{
+      const r=getResolvedResult(m);if(!r)return;
+      rows[m.a].p++;rows[m.b].p++;
+      const winner=r==="a"?m.a:m.b,loser=r==="a"?m.b:m.a;
+      rows[winner].w++;rows[winner].pts++;rows[loser].l++;
+      const sc=state.scores[m.id]||[];
+      if(sc[0]!==""&&sc[1]!==""&&!isNaN(+sc[0])&&!isNaN(+sc[1])){
+        rows[m.a].pf+=+sc[0];rows[m.a].pa+=+sc[1];
+        rows[m.b].pf+=+sc[1];rows[m.b].pa+=+sc[0];
+      }
+    });
+    return rows.sort((a,b)=>b.pts-a.pts||((b.pf-b.pa)-(a.pf-a.pa))||b.pf-a.pf||a.l-b.l||a.id-b.id);
   }
 }
 function renderLB(){
-  const s=standings();$("lbHead").innerHTML="<tr><th>#</th><th>"+(state.format==="rotating"?"Player":"Team")+"</th><th>P</th><th>W</th><th>L</th><th>PF</th><th>PA</th><th>+/-</th></tr>";
-  $("lbBody").innerHTML=s.map((x,i)=>`<tr><td class="rank">${i+1}</td><td><b>${esc(x.name)}</b></td><td>${x.p}</td><td>${x.w}</td><td>${x.l}</td><td>${x.pf}</td><td>${x.pa}</td><td>${x.pf-x.pa}</td></tr>`).join("");
-  const enough=state.format==="rotating"?state.players.length>=8:state.players.length/2>=4;$("startKO").disabled=!enough
+  const s=standings();
+  $("lbHead").innerHTML="<tr><th>#</th><th>"+(state.format==="rotating"?"Player":"Team")+"</th><th>P</th><th>W</th><th>L</th><th>Pts</th><th>PF</th><th>PA</th><th>+/-</th></tr>";
+  $("lbBody").innerHTML=s.map((x,i)=>`<tr><td class="rank">${i+1}</td><td><b>${esc(x.name)}</b></td><td>${x.p}</td><td>${x.w}</td><td>${x.l}</td><td><b>${x.pts}</b></td><td>${x.pf}</td><td>${x.pa}</td><td>${x.pf-x.pa>0?"+":""}${x.pf-x.pa}</td></tr>`).join("");
+  const matches=state.schedule.flat(),done=matches.filter(m=>getResolvedResult(m)).length;
+  const enough=state.format==="rotating"?state.players.length>=8:state.players.length/2>=4;
+  $("startKO").disabled=!enough||done< matches.length;
 }
 $("toLeaderboard").onclick=()=>{renderLB();show(3)};$("backLeague").onclick=()=>{renderLeague();show(2)};
 function createKO(){
