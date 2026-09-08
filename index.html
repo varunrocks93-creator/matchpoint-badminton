@@ -297,6 +297,218 @@ function renderViewerLeaderboardSummary(){
   </div>`).join("");
 }
 function renderLB(){const s=standings();$("lbHead").innerHTML=`<tr><th>#</th><th>${state.format==="rotating"?"Player":"Team"}</th><th>P</th><th>W</th><th>L</th><th>Pts</th><th>PF</th><th>PA</th><th>+/-</th></tr>`;$("lbBody").innerHTML=s.map((x,i)=>`<tr><td class="rank">${i+1}</td><td><b>${esc(x.name)}</b>${state.format==="rotating"&&isAway(x.id)?` <span class="badge away">AWAY</span>`:""}</td><td>${x.p}</td><td>${x.w}</td><td>${x.l}</td><td><b>${x.pts}</b></td><td>${x.pf}</td><td>${x.pa}</td><td>${x.pf-x.pa>0?"+":""}${x.pf-x.pa}</td></tr>`).join("");const matches=state.schedule.flat(),done=matches.filter(m=>getResolvedResult(m)).length,enough=state.format==="rotating"?standings().filter(x=>!isAway(x.id)).length>=4:standings().filter(x=>fixedTeamAvailable(x.id)).length>=4;$("startKO").disabled=!enough||done<matches.length;$("startKO").textContent=state.format==="rotating"?"Lucky Draw →":"Start Knockout →";applyReadOnly()}
+
+function findLeagueMatch(id){return state.schedule.flat().find(m=>m.id===id)||null}
+
+function buildFutureRotating(){
+  const active=state.players.map((_,i)=>i).filter(i=>!isAway(i));
+  if(active.length<4)return [];
+  const played=Object.fromEntries(active.map(i=>[i,0])),partner={},opp={};
+
+  completedMatches().forEach(m=>{
+    [...m.a,...m.b].forEach(i=>{if(played[i]!=null)played[i]++});
+    [m.a,m.b].forEach(t=>{
+      const k=keyPair(t[0],t[1]);partner[k]=(partner[k]||0)+1;
+    });
+    m.a.forEach(a=>m.b.forEach(b=>{
+      const k=keyPair(a,b);opp[k]=(opp[k]||0)+1;
+    }));
+  });
+
+  const rem=Object.fromEntries(active.map(i=>[i,Math.max(0,state.target-(played[i]||0))]));
+  const extra=Object.fromEntries(active.map(i=>[i,0]));
+  const rounds=[];let guard=0;
+
+  while(active.some(i=>rem[i]>0)&&guard++<500){
+    let need=active.filter(i=>rem[i]>0).sort((a,b)=>rem[b]-rem[a]||((played[a]+extra[a])-(played[b]+extra[b])));
+    let use=Math.min(state.courts*4,Math.max(4,Math.floor(Math.max(4,need.length)/4)*4));
+    use=Math.min(use,Math.floor(active.length/4)*4);
+    if(use<4)break;
+
+    const selected=need.slice(0,use);
+    if(selected.length<use){
+      const fillers=active.filter(i=>!selected.includes(i))
+        .sort((a,b)=>(played[a]+extra[a])-(played[b]+extra[b])||Math.random()-.5);
+      selected.push(...fillers.slice(0,use-selected.length));
+    }
+    if(selected.length<4)break;
+
+    const games=bestPartition(selected,partner,opp);
+    const round=[];
+    games.forEach((g,ci)=>{
+      const [A,B]=g;
+      [...A,...B].forEach(i=>{
+        if(rem[i]>0)rem[i]--;
+        else extra[i]++;
+      });
+      [A,B].forEach(t=>{
+        const k=keyPair(t[0],t[1]);partner[k]=(partner[k]||0)+1;
+      });
+      A.forEach(a=>B.forEach(b=>{
+        const k=keyPair(a,b);opp[k]=(opp[k]||0)+1;
+      }));
+      round.push({id:nextId("L"),court:ci+1,a:A,b:B});
+    });
+    if(round.length)rounds.push(round);else break;
+  }
+  return rounds;
+}
+
+function buildFutureFixed(){
+  const teams=[];
+  for(let t=0;t<state.players.length/2;t++)if(fixedTeamAvailable(t))teams.push(t);
+  if(teams.length<2)return [];
+
+  const played=Object.fromEntries(teams.map(t=>[t,0])),opp={};
+  completedMatches().forEach(m=>{
+    if(played[m.a]!=null)played[m.a]++;
+    if(played[m.b]!=null)played[m.b]++;
+    const k=keyPair(m.a,m.b);opp[k]=(opp[k]||0)+1;
+  });
+
+  const rem=Object.fromEntries(teams.map(t=>[t,Math.max(0,state.target-(played[t]||0))]));
+  const extra=Object.fromEntries(teams.map(t=>[t,0]));
+  const rounds=[];let guard=0;
+
+  while(teams.some(t=>rem[t]>0)&&guard++<500){
+    let need=teams.filter(t=>rem[t]>0).sort((a,b)=>rem[b]-rem[a]||((played[a]+extra[a])-(played[b]+extra[b])));
+    let use=Math.min(state.courts*2,Math.max(2,Math.floor(Math.max(2,need.length)/2)*2));
+    use=Math.min(use,Math.floor(teams.length/2)*2);
+    if(use<2)break;
+
+    const selected=need.slice(0,use);
+    if(selected.length<use){
+      const fillers=teams.filter(t=>!selected.includes(t))
+        .sort((a,b)=>(played[a]+extra[a])-(played[b]+extra[b])||Math.random()-.5);
+      selected.push(...fillers.slice(0,use-selected.length));
+    }
+    if(selected.length<2)break;
+
+    let best=null,bestScore=Infinity;
+    for(let a=0;a<180;a++){
+      const s=shuffle(selected),pairs=[];let score=0;
+      for(let i=0;i<s.length;i+=2){
+        const A=s[i],B=s[i+1];
+        if(B==null)continue;
+        score+=(opp[keyPair(A,B)]||0)*10+Math.random();
+        pairs.push([A,B]);
+      }
+      if(score<bestScore){bestScore=score;best=pairs}
+    }
+
+    const round=[];
+    (best||[]).forEach((p,ci)=>{
+      p.forEach(t=>{if(rem[t]>0)rem[t]--;else extra[t]++});
+      const k=keyPair(p[0],p[1]);opp[k]=(opp[k]||0)+1;
+      round.push({id:nextId("L"),court:ci+1,a:p[0],b:p[1]});
+    });
+    if(round.length)rounds.push(round);else break;
+  }
+  return rounds;
+}
+
+function rebuildFutureSchedule(){
+  if(!canEdit())return;
+  freezeAllLabels();
+  const doneRounds=completedRounds();
+  const completedIds=new Set(doneRounds.flat().map(m=>m.id));
+  state.results=Object.fromEntries(Object.entries(state.results||{}).filter(([id])=>completedIds.has(id)));
+  state.scores=Object.fromEntries(Object.entries(state.scores||{}).filter(([id])=>completedIds.has(id)));
+  const future=state.format==="rotating"?buildFutureRotating():buildFutureFixed();
+  state.schedule=[...doneRounds,...future];
+  state.draw=null;state.ko=null;
+  freezeAllLabels();
+  save();renderLeague();
+}
+
+function setLeagueWinner(id,side){
+  if(!canEdit())return;
+  const m=findLeagueMatch(id);if(!m)return;
+  const sc=state.scores[id]||["",""];
+  const complete=sc[0]!==""&&sc[1]!==""&&!isNaN(+sc[0])&&!isNaN(+sc[1])&&+sc[0]!==+sc[1];
+  if(complete){
+    const byScore=+sc[0]>+sc[1]?"a":"b";
+    if(byScore!==side)state.scores[id]=["",""];
+  }
+  state.results[id]=side;
+  save();renderLeague();
+}
+
+function setLeagueScore(id,index,value){
+  if(!canEdit())return;
+  if(!state.scores[id])state.scores[id]=["",""];
+  state.scores[id][index]=value;
+  const sc=state.scores[id];
+  if(sc[0]!==""&&sc[1]!==""&&!isNaN(+sc[0])&&!isNaN(+sc[1])){
+    if(+sc[0]===+sc[1])delete state.results[id];
+    else state.results[id]=+sc[0]>+sc[1]?"a":"b";
+  }
+  save();renderLeague();
+}
+
+document.addEventListener("click",e=>{
+  if(!canEdit())return;
+
+  const win=e.target.closest("[data-win]");
+  if(win){
+    e.preventDefault();
+    const [id,side]=win.dataset.win.split(":");
+    setLeagueWinner(id,side);
+    return;
+  }
+
+  const away=e.target.closest("[data-away]");
+  if(away){
+    e.preventDefault();
+    const i=Number(away.dataset.away);
+    if(isAway(i))delete state.away[String(i)];
+    else state.away[String(i)]=true;
+    rebuildFutureSchedule();
+    return;
+  }
+
+  const repl=e.target.closest("[data-replace]");
+  if(repl){
+    e.preventDefault();
+    const i=Number(repl.dataset.replace),old=state.players[i];
+    const name=(prompt(`Replace ${old} with:`,old)||"").trim();
+    if(!name||name===old)return;
+    if(state.players.some((p,j)=>j!==i&&p.toLowerCase()===name.toLowerCase())){
+      alert("That player name is already in the tournament.");
+      return;
+    }
+    freezeAllLabels();
+    state.players[i]=name;
+    delete state.away[String(i)];
+    state.replacements.push({old,new:name,at:Date.now()});
+    rebuildFutureSchedule();
+    return;
+  }
+
+  const card=e.target.closest("[data-draw-card]");
+  if(card){
+    e.preventDefault();
+    handleDrawCard(Number(card.dataset.drawCard));
+    return;
+  }
+
+  const ko=e.target.closest("[data-kowin]");
+  if(ko){
+    e.preventDefault();
+    const [id,side]=ko.dataset.kowin.split(":");
+    setKOWinner(id,side);
+  }
+});
+
+document.addEventListener("change",e=>{
+  const score=e.target.closest("[data-score]");
+  if(!score||!canEdit())return;
+  const [id,index]=score.dataset.score.split(":");
+  setLeagueScore(id,Number(index),score.value);
+});
+
+$("rerandom").onclick=()=>rebuildFutureSchedule();
+
 $("toLeaderboard").onclick=()=>{renderLB();show(3)};$("backLeague").onclick=()=>{renderLeague();show(2)};
 function openViewerPage(page){
   if(!isViewer())return;
