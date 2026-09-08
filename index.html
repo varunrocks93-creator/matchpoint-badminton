@@ -250,6 +250,42 @@ function renderMatch(m){
     <div class="scoreline"><span class="small">Score</span><input class="score" data-score="${m.id}:0" type="number" min="0" value="${score[0]}"><span>–</span><input class="score" data-score="${m.id}:1" type="number" min="0" value="${score[1]}"></div>
   </div>`
 }
+function standings(){
+  if(state.format==="rotating"){
+    const rows=state.players.map((name,i)=>({id:i,name,p:0,w:0,l:0,pts:0,pf:0,pa:0}));
+    state.schedule.flat().forEach(m=>{
+      const r=getResolvedResult(m);
+      if(!r)return;
+      const A=m.a,B=m.b,winners=r==="a"?A:B,losers=r==="a"?B:A;
+      [...A,...B].forEach(i=>rows[i].p++);
+      winners.forEach(i=>{rows[i].w++;rows[i].pts++});
+      losers.forEach(i=>rows[i].l++);
+      const sc=state.scores[m.id]||[];
+      if(sc[0]!==""&&sc[1]!==""&&!isNaN(+sc[0])&&!isNaN(+sc[1])){
+        const a=+sc[0],b=+sc[1];
+        A.forEach(i=>{rows[i].pf+=a;rows[i].pa+=b});
+        B.forEach(i=>{rows[i].pf+=b;rows[i].pa+=a});
+      }
+    });
+    return rows.sort((a,b)=>b.pts-a.pts||((b.pf-b.pa)-(a.pf-a.pa))||b.pf-a.pf||a.l-b.l||a.name.localeCompare(b.name));
+  }
+
+  const tc=state.players.length/2;
+  const rows=Array.from({length:tc},(_,i)=>({id:i,name:teamText(i),p:0,w:0,l:0,pts:0,pf:0,pa:0}));
+  state.schedule.flat().forEach(m=>{
+    const r=getResolvedResult(m);
+    if(!r)return;
+    rows[m.a].p++;rows[m.b].p++;
+    const winner=r==="a"?m.a:m.b,loser=r==="a"?m.b:m.a;
+    rows[winner].w++;rows[winner].pts++;rows[loser].l++;
+    const sc=state.scores[m.id]||[];
+    if(sc[0]!==""&&sc[1]!==""&&!isNaN(+sc[0])&&!isNaN(+sc[1])){
+      rows[m.a].pf+=+sc[0];rows[m.a].pa+=+sc[1];
+      rows[m.b].pf+=+sc[1];rows[m.b].pa+=+sc[0];
+    }
+  });
+  return rows.sort((a,b)=>b.pts-a.pts||((b.pf-b.pa)-(a.pf-a.pa))||b.pf-a.pf||a.l-b.l||a.id-b.id);
+}
 function renderViewerLeaderboardSummary(){
   const el=$("viewerLbList");
   if(!el)return;
