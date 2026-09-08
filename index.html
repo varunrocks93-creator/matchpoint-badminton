@@ -250,6 +250,16 @@ function renderMatch(m){
     <div class="scoreline"><span class="small">Score</span><input class="score" data-score="${m.id}:0" type="number" min="0" value="${score[0]}"><span>–</span><input class="score" data-score="${m.id}:1" type="number" min="0" value="${score[1]}"></div>
   </div>`
 }
+function renderViewerLeaderboardSummary(){
+  const el=$("viewerLbList");
+  if(!el)return;
+  const s=standings();
+  el.innerHTML=s.map((x,i)=>`<div class="viewer-lb-row">
+    <div class="viewer-lb-rank">#${i+1}</div>
+    <div class="viewer-lb-name">${esc(x.name)}</div>
+    <div class="viewer-lb-meta">${x.w}W-${x.l}L • <b>${x.pts} pts</b> • ${x.pf-x.pa>0?"+":""}${x.pf-x.pa}</div>
+  </div>`).join("");
+}
 function renderLB(){const s=standings();$("lbHead").innerHTML=`<tr><th>#</th><th>${state.format==="rotating"?"Player":"Team"}</th><th>P</th><th>W</th><th>L</th><th>Pts</th><th>PF</th><th>PA</th><th>+/-</th></tr>`;$("lbBody").innerHTML=s.map((x,i)=>`<tr><td class="rank">${i+1}</td><td><b>${esc(x.name)}</b>${state.format==="rotating"&&isAway(x.id)?` <span class="badge away">AWAY</span>`:""}</td><td>${x.p}</td><td>${x.w}</td><td>${x.l}</td><td><b>${x.pts}</b></td><td>${x.pf}</td><td>${x.pa}</td><td>${x.pf-x.pa>0?"+":""}${x.pf-x.pa}</td></tr>`).join("");const matches=state.schedule.flat(),done=matches.filter(m=>getResolvedResult(m)).length,enough=state.format==="rotating"?standings().filter(x=>!isAway(x.id)).length>=4:standings().filter(x=>fixedTeamAvailable(x.id)).length>=4;$("startKO").disabled=!enough||done<matches.length;$("startKO").textContent=state.format==="rotating"?"Lucky Draw →":"Start Knockout →";applyReadOnly()}
 $("toLeaderboard").onclick=()=>{renderLB();show(3)};$("backLeague").onclick=()=>{renderLeague();show(2)};
 function openViewerPage(page){
