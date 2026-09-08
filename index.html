@@ -23,7 +23,7 @@
 <section class="panel hidden" id="connectPanel"><h2 id="connectTitle">Connecting…</h2><div class="hint" id="connectText"></div><div class="actions" id="connectActions"></div></section>
 <section class="panel" id="setupStep"><h2>1. Tournament Setup</h2><div class="hint">Up to 50 players. For 2 courts, you can start with 8 players.</div><div class="grid"><div><label>Number of Players</label><input id="numPlayers" class="field" type="number" min="4" max="50" value="8"></div><div><label>Number of Courts</label><select id="numCourts" class="field"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div><div><label>Tournament Format</label><select id="format" class="field"><option value="rotating">Rotating Partners</option><option value="fixed">Fixed Teams</option></select></div><div><label id="gamesLabel">Games Per Player</label><input id="gamesTarget" class="field" type="number" min="1" max="20" value="6"></div></div><div id="setupError" class="error hidden"></div><div class="actions"><button class="btn primary" id="toNames">Enter Player Names →</button></div></section>
 <section class="panel hidden" id="namesStep"><h2>2. Player Names</h2><div class="hint" id="namesHint"></div><div class="names" id="namesGrid"></div><div id="namesError" class="error hidden"></div><div class="actions"><button class="btn secondary backSetup">← Back</button><button class="btn primary" id="generate">Generate Tournament →</button></div></section>
-<section class="panel hidden" id="leagueStep"><h2>3. League Matches</h2><div class="hint" id="leagueInfo"></div><div class="stats" id="stats"></div><h3>Player Availability</h3><div class="hint" id="availabilityHint">If somebody leaves, mark them Away. Completed matches stay unchanged and only future matches are regenerated.</div><div class="player-status-grid" id="playerStatus"></div><div id="availabilityNotice"></div><div class="replacements" id="replacementLog"></div><h3>Match Schedule</h3><div class="schedule" id="schedule"></div><div class="actions"><button class="btn secondary" id="rerandom">↻ Regenerate Future Matches</button><button class="btn primary" id="toLeaderboard">View Leaderboard →</button></div></section>
+<section class="panel hidden" id="leagueStep"><h2>3. League Matches</h2><div class="hint" id="leagueInfo"></div><div class="stats" id="stats"></div><h3>Player Availability</h3><div class="hint" id="availabilityHint">If somebody leaves, mark them Away. Completed matches stay unchanged and only future matches are regenerated.</div><div class="player-status-grid" id="playerStatus"></div><div id="availabilityNotice"></div><div class="replacements" id="replacementLog"></div><h3>Match Schedule</h3><div class="schedule" id="schedule"></div><div class="actions"><button class="btn secondary" id="rerandom">↻ Regenerate Future Matches</button><button class="btn primary" id="toLeaderboard">View Leaderboard →</button><button class="btn blue" id="shareViewerLeague">📤 Share Viewer Link</button><button class="btn danger" id="freshTournamentLeague">＋ Start Fresh Tournament</button></div></section>
 <section class="panel hidden" id="leaderboardStep"><h2>4. Leaderboard</h2><div class="hint">1 league point per win. Ranked by Pts, then point difference (+/-), then points scored (PF).</div><div class="tablewrap"><table><thead id="lbHead"></thead><tbody id="lbBody"></tbody></table></div><div class="actions"><button class="btn secondary" id="backLeague">← Matches</button><button class="btn primary" id="startKO">Start Knockout →</button></div></section>
 <section class="panel hidden" id="drawStep"><h2>5. Lucky Draw — Pick a Card</h2><div class="hint" id="drawHint">Qualified players pick hidden cards. Matching cards become partners.</div><div class="draw-status" id="drawStatus"></div><div class="draw-cards" id="drawCards"></div><div class="draw-log" id="drawLog"></div><div class="draw-teams" id="drawTeams"></div><div class="actions"><button class="btn secondary" id="drawBack">← Leaderboard</button><button class="btn secondary" id="drawRestart">↻ Restart Draw</button><button class="btn primary" id="drawContinue" disabled>Start Knockout →</button></div></section>
 <section class="panel hidden" id="knockoutStep"><h2>6. Knockout</h2><div class="hint" id="koHint"></div><div class="knockout" id="koArea"></div><div id="championArea"></div><div class="actions"><button class="btn secondary" id="backLB">← Leaderboard</button><button class="btn primary" id="toCost">Cost Split →</button></div></section>
@@ -44,8 +44,8 @@ const DEFAULT_STATE=()=>({players:[],courts:2,format:"rotating",target:6,schedul
 let state=DEFAULT_STATE();
 let idSeq=0;
 let db=null,auth=null;
-const live={id:null,role:"local",ownerUid:null,remoteApplying:false,saveTimer:null,unsub:null,connected:false,error:null};
-const params=new URLSearchParams(location.search),requestedId=params.get("t"),requestedOrganizer=params.get("mode")==="organizer";
+const live={id:null,role:"local",ownerUid:null,organizerToken:null,remoteApplying:false,saveTimer:null,unsub:null,connected:false,error:null};
+const params=new URLSearchParams(location.search),requestedId=params.get("t"),requestedOrganizer=params.get("mode")==="organizer",requestedOrganizerKey=params.get("key");
 
 const firebaseConfig={
   apiKey:"AIzaSyCvD-NsNL8GdUtvKHtFLqsiCsVVjy_Zp9g",
@@ -74,27 +74,94 @@ function applyReadOnly(){document.body.classList.toggle("viewer",isViewer())}
 function save(){storeLocal();renderLiveBar();if(live.role==="organizer"&&live.id&&!live.remoteApplying)queueRemoteSave()}
 function queueRemoteSave(){clearTimeout(live.saveTimer);live.saveTimer=setTimeout(pushRemote,250)}
 async function pushRemote(){if(!db||live.role!=="organizer"||!live.id)return;try{await db.collection("tournaments").doc(live.id).update({stateJson:JSON.stringify(state),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});live.error=null;live.connected=true;renderLiveBar()}catch(e){live.error=e.message||"Sync failed";renderLiveBar()}}
+function makeOrganizerToken(){const b=new Uint8Array(24);crypto.getRandomValues(b);return Array.from(b,x=>x.toString(16).padStart(2,"0")).join("")}
 function viewerUrl(){return live.id?`${location.origin}${location.pathname}?t=${encodeURIComponent(live.id)}`:""}
-function organizerUrl(){return live.id?`${location.origin}${location.pathname}?t=${encodeURIComponent(live.id)}&mode=organizer`:""}
+function organizerUrl(){return live.id&&live.organizerToken?`${location.origin}${location.pathname}?t=${encodeURIComponent(live.id)}&mode=organizer&key=${encodeURIComponent(live.organizerToken)}`:""}
 function authUser(){return auth&&auth.currentUser?auth.currentUser:null}
 function renderLiveBar(){let title="Local Tournament",text="Live sharing is ready on this phone. Create the tournament, then create a viewer link.",dot="live",buttons="";
-  if(live.role==="viewer"){title="LIVE VIEW";text=live.connected?"Read-only • updates automatically from the organizer":"Connecting to live tournament…";dot="live";buttons=live.id?`<button class="btn secondary" data-live="copyViewer">Copy Viewer Link</button>`:""}
-  else if(live.role==="organizer"){title="LIVE ORGANIZER";text=live.error?`Sync problem: ${esc(live.error)}`:(live.connected?"Changes sync automatically to everyone with the viewer link.":"Connecting…");dot=live.error?"warn":"live";buttons=`<button class="btn secondary" data-live="copyViewer">Copy Viewer Link</button><button class="btn secondary" data-live="copyOrganizer">Copy Organizer Link</button>`}
-  else{title="Live sharing ready";text=state.schedule.length?"Create a live viewer link for this tournament.":"Create your tournament first. No Google sign-in is needed.";buttons=`<button class="btn primary" data-live="create" ${state.schedule.length?"":"disabled"}>Create Live Link</button>`}
+  if(live.role==="viewer"){title="LIVE VIEW";text=live.connected?"Read-only • updates automatically from the organizers":"Connecting to live tournament…";dot="live";buttons=live.id?`<button class="btn secondary" data-live="copyViewer">Copy Viewer Link</button>`:""}
+  else if(live.role==="organizer"){title="LIVE ORGANIZER";text=live.error?`Sync problem: ${esc(live.error)}`:(live.connected?"Anyone with the ORGANIZER link can edit. Share VIEWER link for read-only access.":"Connecting…");dot=live.error?"warn":"live";buttons=`<button class="btn primary" data-live="shareViewer">📤 Share Viewer Link</button><button class="btn secondary" data-live="copyViewer">Copy Viewer Link</button><button class="btn secondary" data-live="copyOrganizer">🔑 Copy Organizer Link</button>`}
+  else{title="Live sharing ready";text=state.schedule.length?"Create live links for this tournament.":"Create your tournament first. No Google sign-in is needed.";buttons=`<button class="btn primary" data-live="create" ${state.schedule.length?"":"disabled"}>Create Live Link</button>`}
   $("liveBar").innerHTML=`<div class="liveinfo"><div class="live-title"><span class="dot ${dot}"></span>${title}</div><div class="live-text">${text}</div></div><div class="live-actions">${buttons}</div>`;
   $("footerText").textContent=live.role==="viewer"?"MatchPoint Badminton • Live viewer mode":live.role==="organizer"?"MatchPoint Badminton • Live organizer mode":"MatchPoint Badminton • Local mode";
 }
 async function ensureAnonymous(){if(!auth)throw new Error("Firebase did not load. Check your internet connection.");if(auth.currentUser)return auth.currentUser;await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);const r=await auth.signInAnonymously();return r.user}
 
 async function copyText(t){try{await navigator.clipboard.writeText(t);alert("Link copied ✅")}catch(e){prompt("Copy this link:",t)}}
-async function createLive(){if(!db||!auth)return alert("Firebase did not load. Check your internet connection.");if(!state.schedule.length)return alert("Create the tournament first, then make it live.");try{const u=await ensureAnonymous();const ref=db.collection("tournaments").doc();await ref.set({ownerUid:u.uid,stateJson:JSON.stringify(state),createdAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});live.id=ref.id;live.ownerUid=u.uid;live.role="organizer";live.connected=true;history.replaceState({},"",organizerUrl());renderLiveBar();alert("Live tournament created ✅\n\nShare the VIEWER link with players. Keep the ORGANIZER link on this same phone/browser.")}catch(e){alert((e&&e.message)||"Could not create live tournament")}}
+async function shareViewer(){
+  if(!live.id)return alert("Create a Live Link first.");
+  const url=viewerUrl();
+  try{
+    if(navigator.share)await navigator.share({title:"MatchPoint Badminton — Live View",text:"Follow the tournament live:",url});
+    else await copyText(url);
+  }catch(e){
+    if(!e||e.name!=="AbortError")await copyText(url);
+  }
+}
+async function createLive(){
+  if(!db||!auth)return alert("Firebase did not load. Check your internet connection.");
+  if(!state.schedule.length)return alert("Create the tournament first, then make it live.");
+  const token=makeOrganizerToken();
+  let ref=null;
+  try{
+    const u=await ensureAnonymous();
+    ref=db.collection("tournaments").doc();
+    await ref.set({ownerUid:u.uid,stateJson:JSON.stringify(state),createdAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await ref.collection("private").doc("access").set({token,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    live.id=ref.id;live.ownerUid=u.uid;live.organizerToken=token;live.role="organizer";live.connected=true;
+    history.replaceState({},"",organizerUrl());
+    renderLiveBar();
+    alert("Live tournament created ✅\n\nVIEWER link = read-only.\nORGANIZER link = full editing access on any phone you share it with.");
+  }catch(e){
+    if(ref){try{await ref.delete()}catch(_){}}
+    alert((e&&e.message)||"Could not create live tournament");
+  }
+}
 function remoteState(data){try{return data&&data.stateJson?normalize(JSON.parse(data.stateJson)):normalize(data&&data.state)}catch(e){return DEFAULT_STATE()}}
-async function connectRequested(){if(!requestedId||!db||!auth)return;live.id=requestedId;showConnect("Connecting to tournament…","Please wait a moment.");try{const u=await ensureAnonymous();const snap=await db.collection("tournaments").doc(requestedId).get();if(!snap.exists)throw new Error("Tournament not found.");const data=snap.data();state=remoteState(data);live.ownerUid=data.ownerUid;if(requestedOrganizer&&data.ownerUid===u.uid){live.role="organizer";live.connected=true;storeLocal();renderCurrentPhase()}else{live.role="viewer";live.connected=true;startViewerListener();renderCurrentPhase();if(requestedOrganizer&&data.ownerUid!==u.uid)alert("This organizer link belongs to the phone/browser that created the tournament. This device opened in view-only mode.")}renderLiveBar()}catch(e){showConnect("Could not open tournament",(e&&e.message)||"Please check the link.");live.error=(e&&e.message)||"Connection failed";renderLiveBar()}}
+async function connectRequested(){
+  if(!requestedId||!db||!auth)return;
+  live.id=requestedId;
+  showConnect("Connecting to tournament…","Please wait a moment.");
+  try{
+    const u=await ensureAnonymous();
+    const ref=db.collection("tournaments").doc(requestedId);
+    const snap=await ref.get();
+    if(!snap.exists)throw new Error("Tournament not found.");
+    const data=snap.data();
+    state=remoteState(data);
+    live.ownerUid=data.ownerUid;
+
+    if(requestedOrganizer){
+      if(!requestedOrganizerKey)throw new Error("This organizer link is missing its access key.");
+      if(data.ownerUid!==u.uid){
+        await ref.collection("claims").doc(u.uid).set({
+          token:requestedOrganizerKey,
+          createdAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      live.organizerToken=requestedOrganizerKey;
+      live.role="organizer";
+      live.connected=true;
+      storeLocal();
+      renderCurrentPhase();
+    }else{
+      live.role="viewer";
+      live.connected=true;
+      startViewerListener();
+      renderCurrentPhase();
+    }
+    renderLiveBar();
+  }catch(e){
+    showConnect("Could not open tournament",(e&&e.message)||"Please check the link.");
+    live.error=(e&&e.message)||"Connection failed";
+    renderLiveBar();
+  }
+}
 function startViewerListener(){if(!db||!live.id)return;if(live.unsub)live.unsub();live.unsub=db.collection("tournaments").doc(live.id).onSnapshot(snap=>{if(!snap.exists){showConnect("Tournament not found","The link may be old or deleted.");return}const data=snap.data();live.remoteApplying=true;state=remoteState(data);live.ownerUid=data.ownerUid;live.connected=true;storeLocal();renderCurrentPhase();live.remoteApplying=false;renderLiveBar()},e=>{live.error=e.message;showConnect("Live connection failed",e.message);renderLiveBar()})}
 function renderCurrentPhase(){const p=Math.max(0,Math.min(6,state.phase||0));if(p===0)renderSetupFromState();if(p===1)renderNames();if(p===2)renderLeague();if(p===3)renderLB();if(p===4)renderLuckyDraw();if(p===5)renderKO();if(p===6)renderCost();show(p,false)}
 function renderSetupFromState(){$("numPlayers").value=state.players.length||8;$("numCourts").value=String(state.courts||2);$("format").value=state.format||"rotating";$("gamesTarget").value=state.target||6;$("gamesLabel").textContent=state.format==="fixed"?"Games Per Team":"Games Per Player"}
 
-$("liveBar").addEventListener("click",e=>{const b=e.target.closest("[data-live]");if(!b)return;const a=b.dataset.live;if(a==="create")createLive();if(a==="copyViewer")copyText(viewerUrl());if(a==="copyOrganizer")copyText(organizerUrl())});
+$("liveBar").addEventListener("click",e=>{const b=e.target.closest("[data-live]");if(!b)return;const a=b.dataset.live;if(a==="create")createLive();if(a==="shareViewer")shareViewer();if(a==="copyViewer")copyText(viewerUrl());if(a==="copyOrganizer")copyText(organizerUrl())});
 
 $("format").onchange=()=>{$("gamesLabel").textContent=$("format").value==="rotating"?"Games Per Player":"Games Per Team"};
 $("toNames").onclick=()=>{if(!canEdit())return;const n=+$("numPlayers").value,c=+$("numCourts").value,f=$("format").value,t=+$("gamesTarget").value;if(!Number.isInteger(n)||n<4||n>50)return err("setupError","Players must be between 4 and 50.");if(n<minPlayers(c))return err("setupError",`Need at least ${minPlayers(c)} players to run ${c} court${c>1?"s":""}.`);if(f==="fixed"&&n%2)return err("setupError","Fixed Teams needs an even number of players.");if(!Number.isInteger(t)||t<1||t>20)return err("setupError","Games target must be between 1 and 20.");err("setupError","");state.courts=c;state.format=f;state.target=t;const old=state.players.slice();state.players=Array.from({length:n},(_,i)=>old[i]||`Player ${i+1}`);renderNames();show(1)};
@@ -154,8 +221,22 @@ $("backLB").onclick=()=>{if(state.format==="rotating"){renderLuckyDraw();show(4)
 function renderCost(){if(!state.cost)state.cost={court:0,other:0};$("courtCost").value=state.cost.court||0;$("otherCost").value=state.cost.other||0;const a=+state.cost.court||0,b=+state.cost.other||0,total=a+b,each=state.players.length?total/state.players.length:0;$("costStats").innerHTML=`<div class="stat">Total: <b>₹${total.toFixed(2)}</b></div><div class="stat">Players: <b>${state.players.length}</b></div><div class="stat">Per player: <b>₹${each.toFixed(2)}</b></div>`;applyReadOnly()}
 $("courtCost").onchange=e=>{if(!canEdit())return;state.cost.court=+e.target.value||0;save();renderCost()};$("otherCost").onchange=e=>{if(!canEdit())return;state.cost.other=+e.target.value||0;save();renderCost()};
 function rematchSame(){if(!canEdit())return;if(!confirm("Start a fresh rematch with the SAME players? Scores, draw, knockout and Away status will reset."))return;state.results={};state.scores={};state.draw=null;state.ko=null;state.away={};state.replacements=[];state.cost={court:0,other:0};state.schedule=state.format==="rotating"?makeRotating():makeFixed();freezeAllLabels();state.phase=2;save();renderLeague();show(2)}
-function newTournament(){if(!canEdit())return;if(!confirm("Start a new tournament with new players?"))return;const keepLive=live.role==="organizer"&&live.id;state=DEFAULT_STATE();storeLocal();if(keepLive){state.phase=0;save();renderSetupFromState();show(0)}else{localStorage.removeItem(KEY);history.replaceState({},"",location.pathname);location.reload()}}
+function newTournament(){
+  if(!canEdit())return;
+  if(!confirm("Start a completely fresh tournament?\n\nPlayers, matches and scores will reset. The new live tournament will get NEW viewer and organizer links."))return;
+  if(live.unsub){try{live.unsub()}catch(e){}live.unsub=null}
+  clearTimeout(live.saveTimer);
+  live.id=null;live.role="local";live.ownerUid=null;live.organizerToken=null;live.connected=false;live.error=null;live.remoteApplying=false;
+  state=DEFAULT_STATE();
+  localStorage.removeItem(KEY);
+  history.replaceState({},"",location.pathname);
+  renderSetupFromState();
+  renderLiveBar();
+  show(0,false);
+}
 $("rematch").onclick=rematchSame;$("restart").onclick=newTournament;
+$("freshTournamentLeague").onclick=newTournament;
+$("shareViewerLeague").onclick=()=>{if(live.role==="organizer"&&live.id)shareViewer();else alert("Create a Live Link first, then use Share Viewer Link.");};
 
 function initFirebase(){try{if(typeof firebase==="undefined")throw new Error("Firebase library could not load.");firebase.initializeApp(firebaseConfig);auth=firebase.auth();db=firebase.firestore();auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).then(()=>ensureAnonymous()).then(async()=>{renderLiveBar();if(requestedId)await connectRequested();else renderLiveBar()}).catch(e=>{live.error=(e&&e.message)||"Authentication failed";renderLiveBar();if(requestedId)showConnect("Firebase could not connect",live.error)})}catch(e){live.error=e.message;renderLiveBar();if(requestedId)showConnect("Firebase could not load","Check your internet connection and refresh.")}}
 loadLocal();renderSetupFromState();renderLiveBar();if(requestedId){showConnect("Connecting to tournament…","Please wait.")}else if(state.players.length&&state.schedule.length)renderCurrentPhase();else show(0,false);initFirebase();
